@@ -21,40 +21,43 @@ import Dimensions from 'Dimensions';
 
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = windowWidth*1714/750;
-const SCROLL1TOP = -205; //scroll 1 容器的初始位置
-const SCROLL2TOP = -137; //scroll 2 容器的初始位置
-const SCROLL3TOP = -69;  //scroll 3 容器的初始位置
-const SCROLLITEM =  69;
-const WORDPOSITION = 266;
-const SCROLL1REF = 'SCROLL1REF';
-const SCROLL2REF = 'SCROLL2REF';
-const SCROLL3REF = 'SCROLL3REF';
-const CONTAINER = 'CONTAINER';
+const SCROLL1TOP = -(Math.floor(windowHeight*0.3104)); //scroll 1 容器的初始位置
+const SCROLL2TOP = -(Math.floor(windowHeight*0.2174)); //scroll 2 容器的初始位置
+const SCROLL3TOP = -(Math.floor(windowHeight*0.1243));  //scroll 3 容器的初始位置
+const SCROLLITEM =  Math.floor(windowWidth*0.2156); //每一个奖章的高度，最后用来计算最终的高度
+const WORDPOSITION = Math.floor(windowWidth*0.83125); //文字层位置
+const SCROLL1REF = 'SCROLL1REF'; //ref
+const SCROLL2REF = 'SCROLL2REF'; //ref
+const SCROLL3REF = 'SCROLL3REF'; //ref
+const CONTAINER = 'CONTAINER';  //ref
 const WORDCONTAINER = 'WORDCONTAINER';
+ 
 class prizedraw extends Component {
 
   constructor(props: any) {
     super(props);
-    this._startShake = this._startShake.bind(this);
-    this._rotateAnimated = this._rotateAnimated.bind(this);
-    this._rebackShake = this._rebackShake.bind(this);
-    this._startScroll = this._startScroll.bind(this);
-    this._refSet = this._refSet.bind(this);
-    this._startScrollActurally = this._startScrollActurally.bind(this);
-    this._startWordAnimate = this._startWordAnimate.bind(this);
-    this._desc = this._desc.bind(this);
-    this._rotate = 0;
-    this._time = null;
-    this._prizenum = 3;
-    this.state = {
+    this._startShake = this._startShake.bind(this); //绑定
+    this._rotateAnimated = this._rotateAnimated.bind(this);//绑定
+    this._rebackShake = this._rebackShake.bind(this);//绑定
+    this._startScroll = this._startScroll.bind(this);//绑定
+    this._refSet = this._refSet.bind(this);//绑定
+    this._startScrollActurally = this._startScrollActurally.bind(this);//绑定
+    this._startWordAnimate = this._startWordAnimate.bind(this);//绑定
+    this._getPrize = this._getPrize.bind(this);//绑定
+    this._desc = this._desc.bind(this);//绑定
+    this._rotate = 0;//遥感旋转角度
+    this._time = null;  //计算时间
+    this._prizenum = 3; //竖列次数flag 用来约束点击摇奖 
+    this._prizearr = []; //记录最终摇奖序列
+    this.state = { //遥杆动画状态
         transformYValue: new Animated.Value(0),
         rotateXValue: 0,
     };
   }
-  componentDidMount() {
+  componentDidMount() { //组件加载完后就让文字动
     this._startWordAnimate(0.05);
   }
-  _rebackShake() {
+  _rebackShake() { //回去
       var nowtime = Date.now();
       var detatime = nowtime - this._time;
       this._time = nowtime;
@@ -68,13 +71,13 @@ class prizedraw extends Component {
         requestAnimationFrame(this._rebackShake);
       }
   }
-  _rebackTrans() {
+  _rebackTrans() { //摇完奖后返回
       Animated.timing(this.state.transformYValue, {
            toValue: 0 ,
            duration: 500,  
      }).start();
   }
-  _rotateAnimated() {
+  _rotateAnimated() { //按照x轴旋转效果，可惜transformOrigin 还不支持
       var nowtime = Date.now();
       var detatime = nowtime - this._time;
       this._time = nowtime;
@@ -109,7 +112,7 @@ class prizedraw extends Component {
           var detatime = nowtime - wordTime;
           wordTime = nowtime;
           leftObject -= detatime * speed;
-          if(Math.abs(leftObject) > 1000) {
+          if(Math.abs(leftObject) > 500) {
               leftObject = WORDPOSITION;
               requestAnimationFrame(wordAnimated);
           }else{
@@ -121,7 +124,7 @@ class prizedraw extends Component {
       }
       wordAnimated();
   }
-  _startShake() {
+  _startShake() { //摇奖点击
     if(this._prizenum === 3) {
        this._prizenum = 0;
        Animated.timing(this.state.transformYValue, {
@@ -135,17 +138,20 @@ class prizedraw extends Component {
     }
     
   }
-  _refSet(refer,props) {
+  _refSet(refer,props) { //设置文字的位置
     this.refs[refer].setNativeProps({
              style: {
                 transform:[{translateY: props}]
              }
        })
   }
-  _desc() {
+  _desc() { //点击说明滑动到下面文字
       this.refs.CONTAINER.scrollTo({x: 0, y: 160, animated: true})
   }
-  _startScrollActurally(id,speed,cyclecount) {
+  _getPrize() { //获奖
+     console.log('中奖序列',this._prizearr);
+  }
+  _startScrollActurally(id,speed,cyclecount) { //抽奖具体执行
       let scrollTime = Date.now();
       let scrollObject = null;
       let scrollRefer = null;
@@ -162,38 +168,48 @@ class prizedraw extends Component {
           scrollObject = SCROLL3TOP;
           scrollRefer = SCROLL3REF;
       }
+      let scrollOriginalTop = scrollObject;
       const self = this;
       const scroll = function() {
           var nowtime = Date.now();
           var detatime = nowtime - scrollTime;
           scrollTime = nowtime;
           scrollObject += detatime * speed;
-          if(scrollObject > 0) {
-              scrollObject = SCROLL1TOP;
-              count++;
-              requestAnimationFrame(scroll);
-          }else{
-              if(count > cyclecount) {
-                  let tal = SCROLLITEM - Math.abs(scrollObject)%SCROLLITEM;
-                  scrollObject = scrollObject-tal;
+
+          if(count > cyclecount) {
+              let prizeindex = Math.floor(Math.random() * 6); //随机抽
+              let prizelevel = prizeindex%3; //跟三取余找下标
+              self._prizearr.push(prizelevel+1);
+              let tal = -prizelevel*SCROLLITEM-22;
+                  scrollObject = tal ;
                   self._refSet(scrollRefer,scrollObject);
                   self._prizenum++;
+                  if(self._prizenum === 3) {
+                     setTimeout(self._getPrize,1000);
+                  }
                   return;
-              }else{
+          }else{
+              if(scrollObject >= 0) { //重复
+                  scrollObject = scrollOriginalTop;
+                  count++;
                   self._refSet(scrollRefer,scrollObject);
-                  requestAnimationFrame(scroll);
+              }else {
+                  self._refSet(scrollRefer,scrollObject);
+
               }
-        }
+              requestAnimationFrame(scroll);
+          }
       }
       scroll();
   }
  
-  _startScroll() {
-      let cyclecount = Math.floor(Math.random() * 5) + 25;
+  _startScroll() { //开启摇奖三列按顺序执行大循环随机
+      this._prizearr = []; //清掉抽奖组
+      let cyclecount = Math.floor(Math.random() * 5) + 20;
       this._startScrollActurally(1,4,cyclecount);
-      //cyclecount = Math.floor(Math.random() * 5) + 20;
+      cyclecount = Math.floor(Math.random() * 5) + 20;
       setTimeout(this._startScrollActurally,1000,2,2,cyclecount);
-      //cyclecount = Math.floor(Math.random() * 5) + 15;
+      cyclecount = Math.floor(Math.random() * 5) + 20;
       setTimeout(this._startScrollActurally,2000,3,1,cyclecount);
   }
   render() {
@@ -283,43 +299,43 @@ const styles = StyleSheet.create({
   },
   starbtn: {
     position: 'absolute',
-    width: 30,
-    height: 79,
-    left: 260,
-    top: 295,
+    width: windowWidth * 0.09375,
+    height: windowHeight * 0.1080,
+    left: windowWidth*0.8125,
+    top: windowHeight*0.4035,
   },
   prizeBingo: {
     position: 'absolute',
     flexDirection: 'row',
     justifyContent: 'center',
-    width: 209,
-    height: 173,
-    left: 35,
-    top: 248,
+    width: windowWidth*0.6531,
+    height: windowHeight*0.2366,
+    left: windowWidth*0.1093,
+    top: windowHeight*0.3392,
     overflow: 'hidden',
   },
   prizeBingoContainer: {
-    width: 69,
-    height: 173,
+    width: windowWidth*0.215625,
+    height: windowHeight*0.23666,
   },
   prizeLevel: {
-    width: 69,
-    height: 69,
+    width: windowWidth*0.215625,
+    height: windowWidth*0.215625,
   },
   desc: {
     position: 'absolute',
-    width: 55,
-    height: 40,
-    left: 250,
-    top: 175,
+    width: windowWidth*0.171875,
+    height: windowHeight*0.125,
+    left: windowWidth*0.78125,
+    top: windowHeight*0.2393,
     opacity: 0,
   },
   prizeScrollContainer: {
     position: 'absolute',
-    width: 236,
-    height: 40,
-    left: 12,
-    top: 172,
+    width: windowWidth*0.7375,
+    height: windowHeight*0.054,
+    left: windowWidth*0.0375,
+    top: windowHeight*0.23529,
     overflow: 'hidden',
   },
   word: {
